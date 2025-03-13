@@ -27,7 +27,7 @@ This repository contains an implementation of a **Gesture Recognition** model us
 ### Clone this repository:  
 ```bash
 
-git clone https://github.com/your-username/Gesture-Recognition.git
+git clone https://github.com/AnishRane-cox/Gesture-Recognition-using-3D-CNN
 cd Gesture-Recognition
 ```
 
@@ -44,21 +44,6 @@ python train.py
 ### Test the model:  
 ```bash
 python test.py
-```
-
-### Project Structure  
-```
-├── data/                # Gesture dataset  
-├── models/              # Trained models  
-├── notebooks/           # Jupyter notebooks for experiments  
-├── src/                 # Training and evaluation scripts  
-│   ├── train.py         # Training script  
-│   ├── test.py          # Model testing script  
-│   ├── model.py         # Model architecture  
-│   ├── utils.py         # Utility functions  
-├── results/             # Experiment results  
-├── README.md            # Project documentation  
-└── requirements.txt     # Dependencies  
 ```
 
 ### Results & Conclusion  
