@@ -1,53 +1,93 @@
-# Repository Description: Gesture Recognition using 3D CNN
- This repository contains experiments with various deep learning models for spatiotemporal data classification. The goal is to improve model performance while reducing overfitting and instability.  Key Highlights: Model Variations: Tested different architectures, including Conv3D, ConvLSTM, TimeDistributed Conv2D + LSTM, and hybrid models with GRU. Regularization Techniques: Applied L1/L2 regularization, Batch Normalization, Dropout (spatial and recurrent), and Global Average Pooling to stabilize training. Optimization Strategies: Experimented with learning rate scheduling, data augmentation, and fine-tuning hyperparameters to balance training and validation accuracy. Final Model: Achieved the best validation accuracy (78.00%) by optimizing dropout rates, regularization, and learning rate adjustments. This repository provides code, results, and insights into improving spatiotemporal deep learning models for sequence classification tasks. 
+# ✋ Video Gesture Recognition — 3D CNNs vs. CNN-RNN Hybrids
 
- # Gesture Recognition using 3D CNN  
+![Python](https://img.shields.io/badge/Python-3.x-3776AB?style=flat-square&logo=python&logoColor=white)
+![TensorFlow](https://img.shields.io/badge/TensorFlow%20%2F%20Keras-Conv3D%20%7C%20ConvLSTM-FF6F00?style=flat-square&logo=tensorflow&logoColor=white)
+![Task](https://img.shields.io/badge/Task-Video%20classification-5A32A3?style=flat-square)
+![Status](https://img.shields.io/badge/Status-Complete-1D9E75?style=flat-square)
 
-##  Overview  
-This repository contains an implementation of a **Gesture Recognition** model using **3D Convolutional Neural Networks (Conv3D)**. The model is trained on video-based gesture data to classify different hand or body gestures accurately.  
+> Recognising **5 hand gestures from short video clips** — enabling touch-free control of devices such as a smart TV. **9 architectures** were compared — from plain Conv3D to Conv3D+GRU, CNN+LSTM and ConvLSTM — to find the best accuracy-vs-overfitting trade-off.
 
-##  Features  
-- Uses **Conv3D** layers with **MaxPooling3D** and **Dropout** for feature extraction.  
-- Implements **L2 regularization** to reduce overfitting.  
-- Experiments with different **dropout rates** and **regularization techniques** for optimization.  
-- Achieves a **validation accuracy of 78%**, demonstrating strong generalization.  
+**Final model:** lightweight 3-block Conv3D network · **~479 K parameters** · **val. accuracy ≈ 78%** with train ≈ 76% (no over-fitting).
 
-##  Experiments & Results  
+---
 
-| Experiment Number | Model Configuration | Regularization | Dropout Rate | Learning Rate | Validation Accuracy | Decision & Explanation |
-|------------------|----------------------|----------------|--------------|---------------|----------------------|------------------------|
-| 1 | Conv3D (8,16,32) + MaxPooling3D + Dropout | None | 0.25 | 0.001 | 78.00% | Best performing model with optimal dropout and regularization. |
-| 2 | Conv3D with L2 Regularization | L2 (0.01) | 0.3 | 0.001 | 68.00% | Regularization added stability but reduced validation accuracy. |
-| 3 | Conv3D with Lower Dropout | None | 0.15 | 0.001 | 73.00% | Slight improvement in training accuracy but lower validation performance. |
-| 4 | Conv3D (16,32,64) + L2 Regularization | L2 (0.001) | 0.2 | 0.0005 | 75.50% | Improved generalization but slightly lower accuracy. |
-| 5 | Final Model (Best Configuration) | None | 0.25 | 0.001 | 78.00% | Selected as the best model due to optimal balance of dropout and regularization. |
+## 📌 Problem
 
-### Installation & Usage  
+Each input is a **sequence of 30 frames**. The model must learn both **spatial** features (hand shape) and **temporal** features (direction of motion) to classify the gesture into one of 5 commands.
 
-### Clone this repository:  
-```bash
+## ⚙️ Data Pipeline
 
-git clone https://github.com/AnishRane-cox/Gesture-Recognition-using-3D-CNN
-cd Gesture-Recognition
+A custom Python **generator** feeds the model in batches, so the full video dataset never has to fit in memory:
+
+- selects the frames for each video (30 per clip),
+- resizes frames of two different source resolutions to a fixed **180×180**,
+- normalises pixels to [0, 1],
+- yields `(batch, frames, height, width, channels)` tensors and handles the final partial batch.
+
+## 🔬 Experiments
+
+| # | Architecture | Val. accuracy | Observation |
+|---|---|---|---|
+| 1 | Conv3D | 0.84 (peak) | Training hits 100% → **severe over-fitting** |
+| 2 | Conv3D (variant) | 0.79 | Same over-fitting pattern |
+| 3 | Conv3D + L1/L2 + BatchNorm + Dropout | 0.76 | More stable, occasional loss spikes |
+| 4 | + Global Average Pooling | 0.52 | Over-regularised → under-fits |
+| 5 | + Spatial Dropout | 0.47 | Over-regularised → under-fits |
+| 6 | Conv3D + **GRU** | 0.74 | Good temporal modelling, unstable early training |
+| 7 | TimeDistributed Conv2D + **LSTM** | 0.59 | Over-fits (train ~99%) |
+| 8 | **ConvLSTM2D** + Dropout | 0.56 | Captures spatio-temporal patterns, unstable |
+| **Final** | **Compact Conv3D (8→16→32 filters) + Dropout + L2 + LR scheduling** | **~0.78** | **Best generalisation — train and val. curves converge** |
+
+```mermaid
+flowchart LR
+    I[30 frames<br/>180×180×3] --> C1[Conv3D 8<br/>MaxPool3D]
+    C1 --> C2[Conv3D 16<br/>MaxPool3D · Dropout 0.2]
+    C2 --> C3[Conv3D 32 + L2<br/>MaxPool 2×2×1 · Dropout 0.3]
+    C3 --> F[Flatten → Dense 32<br/>Dropout 0.4]
+    F --> O[Softmax · 5 gestures]
 ```
 
-### Install dependencies:  
+## 💡 Key Findings
+
+- The **highest peak accuracy is not the best model**: Experiment 1 reached 0.84 but memorised the training set.
+- **Too much regularisation hurts** (Experiments 4–5): tuning *how much* regularisation matters as much as adding it.
+- **Hybrid CNN-RNN models** are promising for temporal patterns but need more data and careful tuning to train stably.
+- A **small, well-regularised Conv3D** gave the best balance of accuracy, stability and model size (~479 K params — suitable for an edge device such as a TV).
+
+## 🔭 Next Steps
+
+- Transfer learning with a pre-trained 2D backbone (e.g. MobileNet) + GRU.
+- Temporal data augmentation (frame skipping, speed jitter).
+- Attention over frames; quantisation for on-device inference.
+
+## 🚀 How to Run
+
 ```bash
-pip install -r requirements.txt
+git clone https://github.com/AnishRane-cox/Gesture-Recognition-using-3D-CNN.git
+cd Gesture-Recognition-using-3D-CNN
+pip install tensorflow numpy opencv-python scikit-image matplotlib jupyter
+jupyter notebook Neural_Nets_Project.ipynb
 ```
 
-### Run the training script:  
-```bash
-python train.py
+Update the train/validation folder paths in the notebook to point to the gesture dataset. A GPU is strongly recommended.
+
+## 📁 Repository Structure
+
+```
+├── Neural_Nets_Project.ipynb   # Generator, 9 experiments, final model
+├── Write Up.docx               # Detailed experiment write-up
+├── LICENSE
+└── README.md
 ```
 
-### Test the model:  
-```bash
-python test.py
-```
+---
 
-### Results & Conclusion  
-The final model achieved a validation accuracy of **78%**, making it a robust approach for real-time gesture recognition. The use of **3D CNNs** effectively captures spatiotemporal features in video sequences, leading to improved performance.  
+## 👤 Author
 
-Feel free to contribute or report issues!
+**Anish Rane** — Data & AI Engineer · MSc Machine Learning & AI (LJMU) · Mechanical Engineer
 
+[![Portfolio](https://img.shields.io/badge/Portfolio-1D9E75?style=flat-square&logo=githubpages&logoColor=white)](https://anishrane-cox.github.io/Portfolio/)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=flat-square&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/anish-rane/)
+[![GitHub](https://img.shields.io/badge/GitHub-AnishRane--cox-181717?style=flat-square&logo=github)](https://github.com/AnishRane-cox)
+
+⭐ If you found this useful, consider starring the repo.
